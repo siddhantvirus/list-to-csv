@@ -19,11 +19,17 @@ interface CommaListOptions {
     sqlInClause: boolean;
 }
 
+// Store the last used line conversion settings
+let lastUsedLineOptions: CommaListOptions | undefined;
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
     // Use the console to output diagnostic information (console.log) and errors (console.error)
     console.log('Congratulations, your extension "list-to-csv" is now active!');
+
+    // Try to load last used settings from global state
+    lastUsedLineOptions = context.globalState.get<CommaListOptions>('lastUsedLineOptions');
 
     // Create an instance of our WebView provider
     const listToCSVWebviewProvider = new ListToCSVWebviewProvider(context);
@@ -86,6 +92,10 @@ export function activate(context: vscode.ExtensionContext) {
                     return; // User cancelled the operation
                 }
                 
+                // Save the options as last used
+                lastUsedLineOptions = options;
+                context.globalState.update('lastUsedLineOptions', options);
+                
                 // Convert the text to comma-separated line
                 const result = convertToCommaLine(selectedText, options);
                 
@@ -93,6 +103,69 @@ export function activate(context: vscode.ExtensionContext) {
                 await vscode.env.clipboard.writeText(result);
                 
                 vscode.window.showInformationMessage(`Converted list to ${options.sqlInClause ? 'SQL IN clause' : 'comma-separated line'} and copied to clipboard!`);
+            } catch (error) {
+                vscode.window.showErrorMessage(`Error converting list: ${error}`);
+            }
+        }
+    );
+
+    // Register the command to convert using default settings
+    const convertWithDefaultsCommand = vscode.commands.registerTextEditorCommand(
+        'list-to-csv.convertToCommaLineWithDefaults',
+        async (textEditor: vscode.TextEditor) => {
+            try {
+                // Get the selected text
+                const selection = textEditor.selection;
+                if (selection.isEmpty) {
+                    vscode.window.showInformationMessage('Please select a list to convert');
+                    return;
+                }
+                
+                const selectedText = textEditor.document.getText(selection);
+                
+                // Get default options for conversion
+                const options = getDefaultLineOptions();
+                
+                // Convert the text to comma-separated line
+                const result = convertToCommaLine(selectedText, options);
+                
+                // Copy to clipboard
+                await vscode.env.clipboard.writeText(result);
+                
+                vscode.window.showInformationMessage(`Converted list to ${options.sqlInClause ? 'SQL IN clause' : 'comma-separated line'} using default settings and copied to clipboard!`);
+            } catch (error) {
+                vscode.window.showErrorMessage(`Error converting list: ${error}`);
+            }
+        }
+    );
+    
+    // Register the command to convert using last used settings
+    const convertWithLastUsedCommand = vscode.commands.registerTextEditorCommand(
+        'list-to-csv.convertToCommaLineWithLastUsed',
+        async (textEditor: vscode.TextEditor) => {
+            try {
+                // Get the selected text
+                const selection = textEditor.selection;
+                if (selection.isEmpty) {
+                    vscode.window.showInformationMessage('Please select a list to convert');
+                    return;
+                }
+                
+                const selectedText = textEditor.document.getText(selection);
+                
+                // Check if we have last used settings, if not use default
+                const options = lastUsedLineOptions || getDefaultLineOptions();
+                
+                // Convert the text to comma-separated line
+                const result = convertToCommaLine(selectedText, options);
+                
+                // Copy to clipboard
+                await vscode.env.clipboard.writeText(result);
+                
+                const formatType = options.sqlInClause ? 'SQL IN clause' : 'comma-separated line';
+                vscode.window.showInformationMessage(
+                    `Converted list to ${formatType} using ${lastUsedLineOptions ? 'last used' : 'default'} settings and copied to clipboard!`
+                );
             } catch (error) {
                 vscode.window.showErrorMessage(`Error converting list: ${error}`);
             }
@@ -114,7 +187,9 @@ export function activate(context: vscode.ExtensionContext) {
         convertToCSVCommand, 
         openSettingsCommand,
         openWebviewCommand,
-        convertToCommaLineCommand
+        convertToCommaLineCommand,
+        convertWithDefaultsCommand,
+        convertWithLastUsedCommand
     );
 }
 
@@ -380,6 +455,20 @@ function formatCSVCell(cell: string, options: ConversionOptions): string {
         cell.includes(escapeCharacter);
     
     return needsQuotes ? `${escapeCharacter}${escaped}${escapeCharacter}` : escaped;
+}
+
+/**
+ * Get default options for line conversion
+ */
+function getDefaultLineOptions(): CommaListOptions {
+    const config = vscode.workspace.getConfiguration('list-to-csv.line');
+    
+    return {
+        removeDuplicates: config.get<boolean>('removeDuplicates', false),
+        separator: config.get<string>('separator', ','),
+        enclosure: config.get<string>('enclosure', "'"),
+        sqlInClause: config.get<boolean>('sqlInClause', false),
+    };
 }
 
 // This method is called when your extension is deactivated
