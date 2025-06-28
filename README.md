@@ -92,6 +92,48 @@ banana
 IN ('apple','orange','banana')
 ```
 
+## SQL Table Generation
+
+The extension also provides SQL table generation capabilities:
+
+### Generate SQL Table from Selection
+
+1. Select your tabular data in the editor 
+2. Right-click and choose "Generate SQL Table from Selection" or use the Command Palette
+3. Enter a table name, select your preferred SQL dialect, and choose whether to infer data types
+4. The generated SQL script (both CREATE TABLE and INSERT statements) will be copied to your clipboard
+
+### SQL Dialect Support
+
+- Microsoft SQL Server
+- MySQL
+- PostgreSQL
+- Spark SQL
+
+### Data Type Inference
+
+The extension can automatically infer appropriate data types for columns based on the data:
+- Numeric values (integers, decimals)
+- Dates and timestamps
+- Text values with appropriate length
+
+### Complete SQL Script Generation
+
+The extension generates a complete SQL script that includes:
+- CREATE TABLE statement with proper dialect-specific syntax
+- INSERT statements for all data rows
+- Proper escaping of special characters based on SQL dialect
+- AUTO_INCREMENT/IDENTITY or dialect-specific features
+
+### WebView SQL Options
+
+In the WebView interface, you can also:
+- Enable the "Generate SQL Table" option
+- Configure table name, SQL dialect, and data type inference settings
+- Use the "Generate SQL Table & Data" button to create a complete SQL script and preview it
+
+![SQL Table Generation](https://raw.githubusercontent.com/yourusername/list-to-csv/main/images/sql-table-demo.gif)
+
 ## Extension Settings
 
 This extension provides the following settings:

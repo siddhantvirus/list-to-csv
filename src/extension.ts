@@ -19,6 +19,12 @@ interface CommaListOptions {
     sqlInClause: boolean;
 }
 
+interface SqlTableOptions {
+    tableName: string;
+    dialect: 'mssql' | 'mysql' | 'postgres' | 'spark';
+    inferDataTypes: boolean;
+}
+
 // Define message options for expanded alerts
 const expandedMessageOptions: vscode.MessageOptions = {
     modal: true,
@@ -120,6 +126,48 @@ export function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    // Register the command to generate SQL table from selection
+    const generateSQLTableCommand = vscode.commands.registerTextEditorCommand(
+        'list-to-csv.generateSQLTable',
+        async (textEditor: vscode.TextEditor) => {
+            try {
+                // Get the selected text
+                const selection = textEditor.selection;
+                if (selection.isEmpty) {
+                    const messageOptions = {...expandedMessageOptions};
+                    messageOptions.detail = 'Please select text before generating SQL table.';
+                    vscode.window.showInformationMessage('Please select data to generate SQL table', messageOptions);
+                    return;
+                }
+                
+                const selectedText = textEditor.document.getText(selection);
+
+                // Get SQL table options from user
+                const options = await getSqlTableOptions();
+                if (!options) {
+                    return; // User cancelled the operation
+                }
+                
+                // Generate SQL table creation script
+                const sqlStatement = generateSqlTableScript(selectedText, options);
+                
+                // Copy to clipboard
+                await vscode.env.clipboard.writeText(sqlStatement);
+                
+                const messageOptions = {...expandedMessageOptions};
+                messageOptions.detail = `SQL CREATE TABLE statement for ${options.dialect.toUpperCase()} copied to clipboard.`;
+                vscode.window.showInformationMessage(
+                    `SQL table created successfully!`,
+                    messageOptions
+                );
+            } catch (error) {
+                const messageOptions = {...expandedMessageOptions};
+                messageOptions.detail = `Error details: ${error}`;
+                vscode.window.showErrorMessage(`Error generating SQL table`, messageOptions);
+            }
+        }
+    );
+
     // Register the command to open settings
     const openSettingsCommand = vscode.commands.registerCommand(
         'list-to-csv.openSettings',
@@ -135,7 +183,8 @@ export function activate(context: vscode.ExtensionContext) {
         convertToCSVCommand, 
         openSettingsCommand,
         openWebviewCommand,
-        convertToCommaLineCommand
+        convertToCommaLineCommand,
+        generateSQLTableCommand
     );
 }
 
@@ -401,6 +450,392 @@ function formatCSVCell(cell: string, options: ConversionOptions): string {
         cell.includes(escapeCharacter);
     
     return needsQuotes ? `${escapeCharacter}${escaped}${escapeCharacter}` : escaped;
+}
+
+/**
+ * Prompt the user for SQL table options
+ */
+async function getSqlTableOptions(): Promise<SqlTableOptions | undefined> {
+    // Ask for table name
+    const tableName = await vscode.window.showInputBox({
+        prompt: 'Enter table name',
+        value: 'my_table',
+        validateInput: value => !value ? 'Table name cannot be empty' : null
+    });
+
+    if (!tableName) {
+        return undefined;
+    }
+
+    // Ask about SQL dialect
+    const sqlDialect = await vscode.window.showQuickPick(
+        [
+            { label: 'MS SQL Server', value: 'mssql' },
+            { label: 'MySQL', value: 'mysql' },
+            { label: 'PostgreSQL', value: 'postgres' },
+            { label: 'Spark SQL', value: 'spark' }
+        ],
+        { placeHolder: 'Select SQL dialect' }
+    );
+
+    if (!sqlDialect) {
+        return undefined;
+    }
+
+    // Ask about data type inference
+    const inferDataTypes = await vscode.window.showQuickPick(
+        ['Yes', 'No'],
+        { placeHolder: 'Auto-infer data types?' }
+    );
+
+    if (!inferDataTypes) {
+        return undefined;
+    }
+
+    return {
+        tableName,
+        dialect: sqlDialect.value as 'mssql' | 'mysql' | 'postgres' | 'spark',
+        inferDataTypes: inferDataTypes === 'Yes'
+    };
+}
+
+/**
+ * Generate SQL table creation script from selected text
+ */
+function generateSqlTableScript(text: string, options: SqlTableOptions): string {
+    // Split text into lines and remove empty lines
+    const lines = text.split(/\\r?\\n/).filter(line => line.trim() !== '');
+    
+    if (lines.length === 0) {
+        throw new Error('No valid data found');
+    }
+    
+    // Try to detect if the data is tabular (tab, comma, or pipe separated)
+    let separator = detectSeparator(lines[0]);
+    
+    // Use the first line to get column names or generate default ones
+    const firstLine = lines[0];
+    let headers: string[] = [];
+    let dataLines: string[][] = [];
+    
+    if (separator) {
+        // Data is tabular - first line might be headers
+        headers = firstLine.split(separator).map(h => h.trim());
+        
+        // Process the rest as data rows
+        for (let i = 1; i < lines.length; i++) {
+            if (lines[i].trim()) {
+                dataLines.push(lines[i].split(separator).map(cell => cell.trim()));
+            }
+        }
+    } else {
+        // Single column data
+        headers = ['Column1'];
+        dataLines = lines.map(line => [line.trim()]);
+    }
+    
+    // Clean header names to be valid SQL identifiers
+    headers = headers.map((header, index) => {
+        // If header is empty or just spaces, provide a default name
+        if (!header || header.trim() === '') {
+            return `Column${index + 1}`;
+        }
+        
+        // Replace invalid characters with underscore
+        return header.replace(/[^a-zA-Z0-9_]/g, '_');
+    });
+    
+    // Generate the SQL table creation script
+    return createSqlTableStatement(headers, dataLines, options);
+}
+
+/**
+ * Detect the separator used in data
+ */
+function detectSeparator(line: string): string | null {
+    if (line.includes('\\t')) {
+        return '\\t';
+    } else if (line.includes(',')) {
+        return ',';
+    } else if (line.includes('|')) {
+        return '|';
+    } else if (line.match(/\\s{2,}/)) {
+        return ' '; // Use a single space as a marker for multiple spaces
+    }
+    return null;
+}
+
+/**
+ * Create a SQL table creation statement
+ */
+function createSqlTableStatement(
+    headers: string[],
+    sampleData: string[][],
+    options: SqlTableOptions
+): string {
+    const { tableName, dialect, inferDataTypes } = options;
+    
+    // Start building the SQL statement
+    let sql = '';
+    
+    // Add CREATE TABLE clause with proper identifier quoting
+    switch (dialect) {
+        case 'mssql':
+            sql = `CREATE TABLE [${tableName}] (\n`;
+            break;
+        case 'mysql':
+            sql = `CREATE TABLE \`${tableName}\` (\n`;
+            break;
+        case 'postgres':
+            sql = `CREATE TABLE "${tableName}" (\n`;
+            break;
+        case 'spark':
+            sql = `CREATE TABLE ${tableName} (\n`;
+            break;
+    }
+    
+    // Add columns
+    for (let i = 0; i < headers.length; i++) {
+        const header = headers[i];
+        let dataType = inferDataTypes && sampleData.length > 0 
+            ? inferSqlDataType(sampleData, i, dialect) 
+            : getDefaultDataType(dialect);
+        
+        // Add column definition with proper identifier quoting
+        switch (dialect) {
+            case 'mssql':
+                sql += `    [${header}] ${dataType}`;
+                break;
+            case 'mysql':
+                sql += `    \`${header}\` ${dataType}`;
+                break;
+            case 'postgres':
+                sql += `    "${header}" ${dataType}`;
+                break;
+            case 'spark':
+                sql += `    ${header} ${dataType}`;
+                break;
+        }
+        
+        if (i < headers.length - 1) {
+            sql += ',\n';
+        } else {
+            sql += '\n';
+        }
+    }
+    
+    // Close the statement
+    sql += ')';
+    
+    // Add dialect-specific extras
+    if (dialect === 'spark') {
+        sql += '\nUSING DELTA';
+    } else if (dialect === 'mysql') {
+        sql += '\nENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+    } else if (dialect === 'postgres') {
+        sql += ';';
+    }
+    
+    // Add INSERT statements for data
+    if (sampleData.length > 0) {
+        sql += '\n\n-- Insert data into table\n';
+        
+        // Generate INSERT statements for each row
+        for (let i = 0; i < sampleData.length; i++) {
+            const row = sampleData[i];
+            let insertStmt = '';
+            
+            // Add the INSERT INTO statement with proper quoting for table name
+            switch (dialect) {
+                case 'mssql':
+                    insertStmt = `INSERT INTO [${tableName}] (`;
+                    break;
+                case 'mysql':
+                    insertStmt = `INSERT INTO \`${tableName}\` (`;
+                    break;
+                case 'postgres':
+                    insertStmt = `INSERT INTO "${tableName}" (`;
+                    break;
+                case 'spark':
+                    insertStmt = `INSERT INTO ${tableName} (`;
+                    break;
+            }
+            
+            // Add column names
+            for (let j = 0; j < headers.length; j++) {
+                switch (dialect) {
+                    case 'mssql':
+                        insertStmt += `[${headers[j]}]`;
+                        break;
+                    case 'mysql':
+                        insertStmt += `\`${headers[j]}\``;
+                        break;
+                    case 'postgres':
+                        insertStmt += `"${headers[j]}"`;
+                        break;
+                    case 'spark':
+                        insertStmt += headers[j];
+                        break;
+                }
+                
+                if (j < headers.length - 1) {
+                    insertStmt += ', ';
+                }
+            }
+            
+            insertStmt += ') VALUES (';
+            
+            // Add values with proper SQL escaping
+            for (let j = 0; j < headers.length; j++) {
+                const value = j < row.length ? row[j] : '';
+                const formattedValue = formatSqlValue(value, inferDataTypes, dialect);
+                
+                insertStmt += formattedValue;
+                
+                if (j < headers.length - 1) {
+                    insertStmt += ', ';
+                }
+            }
+            
+            insertStmt += ')';
+            
+            if (dialect === 'postgres' || dialect === 'mysql') {
+                insertStmt += ';';
+            }
+            
+            sql += insertStmt + '\n';
+        }
+    }
+    
+    return sql;
+}
+
+/**
+ * Infer SQL data type based on sample data
+ */
+function inferSqlDataType(sampleData: string[][], columnIndex: number, dialect: string): string {
+    // Check sample values to infer the data type
+    const sampleValues = sampleData
+        .map(row => columnIndex < row.length ? row[columnIndex] : '')
+        .filter(value => value !== null && value !== undefined && value.trim() !== '');
+    
+    if (sampleValues.length === 0) {
+        return getDefaultDataType(dialect);
+    }
+
+    // Check if all values are numeric
+    let allNumbers = true;
+    let allIntegers = true;
+    let maxLength = 0;
+    
+    for (const value of sampleValues) {
+        // Update max text length
+        maxLength = Math.max(maxLength, value.length);
+        
+        // Check if can be parsed as a number
+        const num = Number(value);
+        if (isNaN(num)) {
+            allNumbers = false;
+            allIntegers = false;
+        } else if (!Number.isInteger(num)) {
+            allIntegers = false;
+        }
+        
+        // Stop checking numbers if we already know it's not all numbers
+        if (!allNumbers) {
+            break;
+        }
+    }
+    
+    // Check for date patterns
+    const datePattern = /^\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}$/;
+    const allDates = sampleValues.every(value => datePattern.test(value));
+    
+    // Timestamp pattern (date with time)
+    const timestampPattern = /^\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}[T\\s]\\d{1,2}:\\d{1,2}(:\\d{1,2})?$/;
+    const allTimestamps = sampleValues.every(value => timestampPattern.test(value));
+    
+    // Determine data type based on dialect
+    switch (dialect) {
+        case 'mssql':
+            if (allTimestamps) { return 'DATETIME'; }
+            if (allDates) { return 'DATE'; }
+            if (allIntegers) { return 'INT'; }
+            if (allNumbers) { return 'FLOAT'; }
+            if (maxLength <= 255) { return `VARCHAR(255)`; }
+            return 'TEXT';
+            
+        case 'mysql':
+            if (allTimestamps) { return 'DATETIME'; }
+            if (allDates) { return 'DATE'; }
+            if (allIntegers) { return 'INT'; }
+            if (allNumbers) { return 'FLOAT'; }
+            if (maxLength <= 255) { return `VARCHAR(255)`; }
+            return 'TEXT';
+            
+        case 'postgres':
+            if (allTimestamps) { return 'TIMESTAMP'; }
+            if (allDates) { return 'DATE'; }
+            if (allIntegers) { return 'INTEGER'; }
+            if (allNumbers) { return 'DECIMAL'; }
+            if (maxLength <= 255) { return `VARCHAR(255)`; }
+            return 'TEXT';
+            
+        case 'spark':
+            if (allTimestamps) { return 'TIMESTAMP'; }
+            if (allDates) { return 'DATE'; }
+            if (allIntegers) { return 'INT'; }
+            if (allNumbers) { return 'DOUBLE'; }
+            return 'STRING';
+    }
+    
+    return getDefaultDataType(dialect);
+}
+
+/**
+ * Get default data type for a SQL dialect
+ */
+function getDefaultDataType(dialect: string): string {
+    switch (dialect) {
+        case 'mssql': return 'VARCHAR(255)';
+        case 'mysql': return 'VARCHAR(255)';
+        case 'postgres': return 'VARCHAR(255)';
+        case 'spark': return 'STRING';
+        default: return 'VARCHAR(255)';
+    }
+}
+
+/**
+ * Format SQL value based on its content and dialect
+ */
+function formatSqlValue(value: string, inferDataTypes: boolean, dialect: string): string {
+    if (!value || value.trim() === '') {
+        return 'NULL';
+    }
+    
+    // Try to convert to number
+    const num = Number(value);
+    if (!isNaN(num) && inferDataTypes) {
+        return value;
+    }
+    
+    // Check for date patterns
+    const datePattern = /^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/;
+    const timestampPattern = /^\d{4}[-/]\d{1,2}[-/]\d{1,2}[T\s]\d{1,2}:\d{1,2}(:\d{1,2})?$/;
+    
+    if ((datePattern.test(value) || timestampPattern.test(value)) && inferDataTypes) {
+        if (dialect === 'spark') {
+            return `'${value}'`;
+        } else if (dialect === 'mssql') {
+            return `'${value}'`;
+        } else {
+            return `'${value}'`;
+        }
+    }
+    
+    // Escape single quotes
+    const escaped = value.replace(/'/g, "''");
+    return `'${escaped}'`;
 }
 
 // This method is called when your extension is deactivated

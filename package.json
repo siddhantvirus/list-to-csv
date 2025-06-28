@@ -29,6 +29,10 @@
       {
         "command": "list-to-csv.convertToCommaLine",
         "title": "Convert List to Comma Separated Line"
+      },
+      {
+        "command": "list-to-csv.generateSQLTable",
+        "title": "Generate SQL Table from Selection"
       }
     ],
     "menus": {
@@ -45,6 +49,11 @@
         },
         {
           "command": "list-to-csv.openWebview",
+          "when": "editorHasSelection",
+          "group": "1_modification"
+        },
+        {
+          "command": "list-to-csv.generateSQLTable",
           "when": "editorHasSelection",
           "group": "1_modification"
         }
