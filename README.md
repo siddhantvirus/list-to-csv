@@ -1,5 +1,7 @@
 # List to CSV
 
+<img src="images/icon.png" alt="List to CSV Icon" width="128">
+
 A Visual Studio Code extension to easily convert various list formats into CSV data.
 
 ## Features

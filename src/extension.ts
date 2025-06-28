@@ -25,6 +25,7 @@ interface SqlTableOptions {
     dialect: 'mssql' | 'mysql' | 'postgres' | 'spark';
     inferDataTypes: boolean;
     previewData?: boolean;
+    includeHeaders?: boolean;
 }
 
 // Define message options for expanded alerts
@@ -150,8 +151,8 @@ export function activate(context: vscode.ExtensionContext) {
                     return; // User cancelled the operation
                 }
                 
-                // Parse the data first for potential preview
-                const { headers, dataLines } = parseSqlTabularData(selectedText);
+                // Parse the data for preview or SQL generation
+                const { headers, dataLines } = parseSqlTabularData(selectedText, options.includeHeaders);
                 
                 // Show preview if requested
                 if (options.previewData) {
@@ -160,10 +161,25 @@ export function activate(context: vscode.ExtensionContext) {
                     if (previewResult === 'cancelled') {
                         return; // User cancelled after preview
                     }
+                    
+                    // If user proceeded after preview, generate SQL from the parsed data
+                    // This ensures we use the same data that was previewed
+                    const sqlStatement = createSqlTableStatement(headers, dataLines, options);
+                    
+                    // Copy to clipboard
+                    await vscode.env.clipboard.writeText(sqlStatement);
+                    
+                    const messageOptions = {...expandedMessageOptions};
+                    messageOptions.detail = `SQL CREATE TABLE statement for ${options.dialect.toUpperCase()} copied to clipboard.`;
+                    vscode.window.showInformationMessage(
+                        `SQL table created successfully!`,
+                        messageOptions
+                    );
+                    return;
                 }
                 
-                // Generate SQL table creation script
-                const sqlStatement = generateSqlTableScript(selectedText, options);
+                // No preview requested, generate SQL directly
+                const sqlStatement = createSqlTableStatement(headers, dataLines, options);
                 
                 // Copy to clipboard
                 await vscode.env.clipboard.writeText(sqlStatement);
@@ -515,12 +531,23 @@ async function getSqlTableOptions(): Promise<SqlTableOptions | undefined> {
     if (!previewData) {
         return undefined;
     }
+    
+    // Ask if the first row contains headers
+    const includeHeaders = await vscode.window.showQuickPick(
+        ['Yes', 'No'],
+        { placeHolder: 'Does your data include column headers in the first row?' }
+    );
+
+    if (!includeHeaders) {
+        return undefined;
+    }
 
     return {
         tableName,
         dialect: sqlDialect.value as 'mssql' | 'mysql' | 'postgres' | 'spark',
         inferDataTypes: inferDataTypes === 'Yes',
-        previewData: previewData === 'Yes'
+        previewData: previewData === 'Yes',
+        includeHeaders: includeHeaders === 'Yes'
     };
 }
 
@@ -529,7 +556,7 @@ async function getSqlTableOptions(): Promise<SqlTableOptions | undefined> {
  */
 function generateSqlTableScript(text: string, options: SqlTableOptions): string {
     // Parse the data into headers and rows
-    const { headers, dataLines } = parseSqlTabularData(text);
+    const { headers, dataLines } = parseSqlTabularData(text, options.includeHeaders);
     
     // Generate the SQL table creation script
     return createSqlTableStatement(headers, dataLines, options);
@@ -773,8 +800,10 @@ function createSqlTableStatement(
 
 /**
  * Parse selected text into structured tabular data for SQL processing
+ * @param text The text to parse
+ * @param hasHeaders Whether the first row contains headers (default: true)
  */
-function parseSqlTabularData(text: string): { headers: string[], dataLines: string[][] } {
+function parseSqlTabularData(text: string, hasHeaders: boolean = true): { headers: string[], dataLines: string[][] } {
     // Split text into lines and remove empty lines
     const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
     
@@ -791,32 +820,57 @@ function parseSqlTabularData(text: string): { headers: string[], dataLines: stri
     let dataLines: string[][] = [];
     
     if (separator) {
-        // Data is tabular - first line contains headers
-        const rawHeaders = firstLine.split(separator);
-        // Create clean headers (non-empty)
-        headers = rawHeaders.map((header, index) => {
-            const cleaned = header.trim();
-            return cleaned === '' ? `Column${index + 1}` : cleaned;
-        });
-        
-        // Process the rest as data rows
-        for (let i = 1; i < lines.length; i++) {
-            if (lines[i].trim()) {
-                // Split the line by separator and handle each cell
-                const rowCells = lines[i].split(separator);
-                const processedCells: string[] = [];
-                
-                // Process each cell in the row, matching with header count
-                for (let j = 0; j < headers.length; j++) {
-                    if (j < rowCells.length) {
-                        processedCells.push(rowCells[j].trim());
-                    } else {
-                        // If we have fewer cells than headers, pad with empty strings
-                        processedCells.push('');
+        if (hasHeaders) {
+            // Data is tabular - first line contains headers
+            const rawHeaders = firstLine.split(separator);
+            // Create clean headers (non-empty)
+            headers = rawHeaders.map((header, index) => {
+                const cleaned = header.trim();
+                return cleaned === '' ? `Column${index + 1}` : cleaned;
+            });
+            
+            // Process the rest as data rows (starting from second line)
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].trim()) {
+                    // Split the line by separator and handle each cell
+                    const rowCells = lines[i].split(separator);
+                    const processedCells: string[] = [];
+                    
+                    // Process each cell in the row, matching with header count
+                    for (let j = 0; j < headers.length; j++) {
+                        if (j < rowCells.length) {
+                            processedCells.push(rowCells[j].trim());
+                        } else {
+                            // If we have fewer cells than headers, pad with empty strings
+                            processedCells.push('');
+                        }
                     }
+                    
+                    dataLines.push(processedCells);
                 }
-                
-                dataLines.push(processedCells);
+            }
+        } else {
+            // No headers in data, generate column names and include all lines as data
+            const columnCount = firstLine.split(separator).length;
+            headers = Array.from({ length: columnCount }, (_, i) => `Column${i + 1}`);
+            
+            // Process all lines as data (including first line)
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].trim()) {
+                    const rowCells = lines[i].split(separator);
+                    const processedCells: string[] = [];
+                    
+                    // Process each cell in the row, matching with header count
+                    for (let j = 0; j < headers.length; j++) {
+                        if (j < rowCells.length) {
+                            processedCells.push(rowCells[j].trim());
+                        } else {
+                            processedCells.push('');
+                        }
+                    }
+                    
+                    dataLines.push(processedCells);
+                }
             }
         }
     } else {
@@ -1033,6 +1087,10 @@ function getPreviewWebviewContent(headers: string[], dataLines: string[][], opti
                 <div class="info-row">
                     <div class="info-label">Infer Data Types:</div>
                     <div>${options.inferDataTypes ? 'Yes' : 'No'}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Headers Included:</div>
+                    <div>${options.includeHeaders ? 'Yes' : 'No'}</div>
                 </div>
                 <div class="info-row">
                     <div class="info-label">Column Count:</div>
