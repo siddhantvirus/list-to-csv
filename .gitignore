@@ -3,3 +3,6 @@ dist
 node_modules
 .vscode-test/
 *.vsix
+# Generated JavaScript files from TypeScript compilation
+src/**/*.js
+src/**/*.js.map
