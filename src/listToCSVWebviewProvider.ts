@@ -147,7 +147,7 @@ export class ListToCSVWebviewProvider {
 
                 .options-grid {
                     display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+                    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
                     gap: 1rem;
                     margin-bottom: 1.5rem;
                 }
@@ -179,20 +179,20 @@ export class ListToCSVWebviewProvider {
                     accent-color: var(--vscode-checkbox-background);
                 }
 
-                .separator-input {
-                    width: 100%;
-                    max-width: 100%;
-                    box-sizing: border-box;
-                }
-
                 input[type="text"] {
-                    width: 100%;
+                    width: calc(100% - 16px); /* Adjust width accounting for padding */
                     padding: var(--input-padding-vertical) var(--input-padding-horizontal);
                     border: 1px solid var(--vscode-input-border);
                     color: var(--vscode-input-foreground);
                     background-color: var(--vscode-input-background);
                     border-radius: var(--border-radius);
-                    box-sizing: border-box;
+                    box-sizing: border-box; /* Add box-sizing to contain the element within its parent */
+                    max-width: 100%; /* Ensure it doesn't overflow its container */
+                }
+
+                .separator-input {
+                    width: 100%; /* Make the container full width */
+                    box-sizing: border-box; /* Ensure padding is included in width calculation */
                 }
 
                 button {
@@ -318,6 +318,7 @@ export class ListToCSVWebviewProvider {
 
             <script>
                 const vscode = acquireVsCodeApi();
+                let hasError = false;
 
                 // Handle messages from the extension
                 window.addEventListener('message', event => {
@@ -325,6 +326,26 @@ export class ListToCSVWebviewProvider {
                     if (message.command === 'setContent') {
                         document.getElementById('listInput').value = message.content;
                     }
+                });
+
+                // Set up event listeners when the document loads
+                document.addEventListener('DOMContentLoaded', function() {
+                    // Add input event listener to clear errors when typing
+                    document.getElementById('listInput').addEventListener('input', function() {
+                        if (hasError) {
+                            clearStatus();
+                        }
+                    });
+                    
+                    // Add event listeners for all form controls to clear error messages
+                    const formControls = document.querySelectorAll('input, textarea, select');
+                    formControls.forEach(control => {
+                        control.addEventListener('change', function() {
+                            if (hasError) {
+                                clearStatus();
+                            }
+                        });
+                    });
                 });
 
                 // Preview function - shows result without copying
@@ -421,6 +442,13 @@ export class ListToCSVWebviewProvider {
                     });
                 }
 
+                // Clear status message
+                function clearStatus() {
+                    const statusArea = document.getElementById('Status');
+                    statusArea.classList.add('hidden');
+                    hasError = false;
+                }
+
                 // Show status message
                 function showStatus(message, isSuccess) {
                     const statusArea = document.getElementById('Status');
@@ -429,16 +457,20 @@ export class ListToCSVWebviewProvider {
                     
                     if (isSuccess) {
                         statusArea.classList.add('success');
+                        hasError = false;
                     } else {
                         statusArea.classList.remove('success');
+                        hasError = true;
                     }
                     
-                    // Auto hide after 5 seconds
-                    setTimeout(() => {
-                        if (!statusArea.classList.contains('pinned')) {
-                            statusArea.classList.add('hidden');
-                        }
-                    }, 5000);
+                    // Auto hide success messages after 5 seconds, but keep errors visible until user interaction
+                    if (isSuccess) {
+                        setTimeout(() => {
+                            if (!statusArea.classList.contains('pinned')) {
+                                statusArea.classList.add('hidden');
+                            }
+                        }, 5000);
+                    }
                 }
             </script>
         </body>
