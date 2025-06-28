@@ -15,50 +15,64 @@
   "contributes": {
     "commands": [
       {
-        "command": "list-to-csv.convert",
-        "title": "Convert List to CSV"
-      },
-      {
-        "command": "list-to-csv.openSettings",
-        "title": "Open List to CSV Settings"
-      },
-      {
         "command": "list-to-csv.openWebview",
-        "title": "Open List to CSV Converter (WebView)"
+        "title": "List to CSV: Open Converter"
+      },
+      {
+        "command": "list-to-csv.convert",
+        "title": "List to CSV: Convert to CSV Format",
+        "category": "List to CSV"
       },
       {
         "command": "list-to-csv.convertToCommaLine",
-        "title": "Convert List to Comma Separated Line"
+        "title": "List to CSV: Convert to Comma Separated Line",
+        "category": "List to CSV"
       },
       {
         "command": "list-to-csv.generateSQLTable",
-        "title": "Generate SQL Table from Selection"
+        "title": "List to CSV: Generate SQL Table from Selection",
+        "category": "List to CSV"
+      },
+      {
+        "command": "list-to-csv.openSettings",
+        "title": "List to CSV: Open Extension Settings",
+        "category": "List to CSV"
       }
     ],
     "menus": {
       "editor/context": [
         {
-          "command": "list-to-csv.convert",
+          "command": "list-to-csv.openWebview",
           "when": "editorHasSelection",
-          "group": "1_modification"
+          "group": "list-to-csv@1"
+        },
+        {
+          "submenu": "list-to-csv.submenu",
+          "when": "editorHasSelection",
+          "group": "list-to-csv@2"
+        }
+      ],
+      "list-to-csv.submenu": [
+        {
+          "command": "list-to-csv.convert",
+          "group": "1_convert@1"
         },
         {
           "command": "list-to-csv.convertToCommaLine",
-          "when": "editorHasSelection",
-          "group": "1_modification"
-        },
-        {
-          "command": "list-to-csv.openWebview",
-          "when": "editorHasSelection",
-          "group": "1_modification"
+          "group": "1_convert@2"
         },
         {
           "command": "list-to-csv.generateSQLTable",
-          "when": "editorHasSelection",
-          "group": "1_modification"
+          "group": "1_convert@3"
         }
       ]
     },
+    "submenus": [
+      {
+        "id": "list-to-csv.submenu",
+        "label": "List to CSV Options"
+      }
+    ],
     "configuration": {
       "title": "List to CSV",
       "properties": {

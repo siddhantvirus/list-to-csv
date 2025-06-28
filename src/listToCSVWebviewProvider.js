@@ -1,69 +1,86 @@
-import * as vscode from 'vscode';
-import * as path from 'path';
-import * as fs from 'fs';
-
-export class ListToCSVWebviewProvider {
-    public static readonly viewType = 'list-to-csv.webview';
-    private _panel: vscode.WebviewPanel | undefined;
-    private readonly _extensionUri: vscode.Uri;
-
-    constructor(private readonly context: vscode.ExtensionContext) {
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ListToCSVWebviewProvider = void 0;
+const vscode = __importStar(require("vscode"));
+class ListToCSVWebviewProvider {
+    context;
+    static viewType = 'list-to-csv.webview';
+    _panel;
+    _extensionUri;
+    constructor(context) {
+        this.context = context;
         this._extensionUri = context.extensionUri;
     }
-
-    public show() {
+    show() {
         if (this._panel) {
             // If the webview panel already exists, reveal it
             this._panel.reveal(vscode.ViewColumn.One);
-        } else {
+        }
+        else {
             // Create a new webview panel
-            this._panel = vscode.window.createWebviewPanel(
-                ListToCSVWebviewProvider.viewType,
-                'List to CSV Converter',
-                vscode.ViewColumn.One,
-                {
-                    enableScripts: true,
-                    retainContextWhenHidden: true,
-                    localResourceRoots: [this._extensionUri]
-                }
-            );
-
+            this._panel = vscode.window.createWebviewPanel(ListToCSVWebviewProvider.viewType, 'List to CSV Converter', vscode.ViewColumn.One, {
+                enableScripts: true,
+                retainContextWhenHidden: true,
+                localResourceRoots: [this._extensionUri]
+            });
             // Set webview content
             this._panel.webview.html = this._getWebviewContent(this._panel.webview);
-
             // Listen for messages from the WebView
-            this._panel.webview.onDidReceiveMessage(
-                message => {
-                    switch (message.command) {
-                        case 'convertAndCopy':
-                            vscode.window.showInformationMessage(`Converted and copied ${message.count} records to clipboard!`);
-                            return;
-                        case 'sqlTableCreated':
-                            vscode.window.showInformationMessage(`SQL table successfully generated for ${message.dialect.toUpperCase()} dialect!`);
-                            return;
-                        case 'generateSql':
-                            vscode.env.clipboard.writeText(message.sql);
-                            vscode.window.showInformationMessage(`SQL table definition copied to clipboard!`);
-                            return;
-                        case 'error':
-                            vscode.window.showErrorMessage(message.text);
-                            return;
-                    }
-                },
-                null,
-                this.context.subscriptions
-            );
-
+            this._panel.webview.onDidReceiveMessage(message => {
+                switch (message.command) {
+                    case 'convertAndCopy':
+                        vscode.window.showInformationMessage(`Converted and copied ${message.count} records to clipboard!`);
+                        return;
+                    case 'sqlTableCreated':
+                        vscode.window.showInformationMessage(`SQL table successfully generated for ${message.dialect.toUpperCase()} dialect!`);
+                        return;
+                    case 'generateSql':
+                        vscode.env.clipboard.writeText(message.sql);
+                        vscode.window.showInformationMessage(`SQL table definition copied to clipboard!`);
+                        return;
+                    case 'error':
+                        vscode.window.showErrorMessage(message.text);
+                        return;
+                }
+            }, null, this.context.subscriptions);
             // Reset when the panel is closed
-            this._panel.onDidDispose(
-                () => {
-                    this._panel = undefined;
-                },
-                null,
-                this.context.subscriptions
-            );
+            this._panel.onDidDispose(() => {
+                this._panel = undefined;
+            }, null, this.context.subscriptions);
         }
-
         // If there's an active text editor with a selection, send that text to the webview
         if (vscode.window.activeTextEditor) {
             const editor = vscode.window.activeTextEditor;
@@ -79,8 +96,7 @@ export class ListToCSVWebviewProvider {
             }
         }
     }
-
-    private _getWebviewContent(webview: vscode.Webview): string {
+    _getWebviewContent(webview) {
         // Create a completely new modern UI instead of modifying Sample.HTML
         return `<!DOCTYPE html>
         <html lang="en">
@@ -957,3 +973,5 @@ export class ListToCSVWebviewProvider {
         </html>`;
     }
 }
+exports.ListToCSVWebviewProvider = ListToCSVWebviewProvider;
+//# sourceMappingURL=listToCSVWebviewProvider.js.map
