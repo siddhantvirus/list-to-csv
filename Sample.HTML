@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>List to Comma Separated Line</title>
+    <style>
+        body {
+            background-color: #f2f2f2;
+            font-family: Arial, sans-serif;
+            color: #333333;
+            margin: 20px;
+        }
+
+        h1 {
+            color: #0099cc;
+            ​ text-align: center;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #cccccc;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #0099cc;
+            color: #ffffff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0077b3;
+        }
+
+        #Status {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #e6e6e6;
+            border: 1px solid #cccccc;
+            border-radius: 4px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        input[type="checkbox"],
+        input[type="radio"] {
+            margin-right: 5px;
+        }
+
+        .option-group {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>List to Comma Separated Line</h1>
+
+    <textarea id="listInput" rows="4" cols="50"></textarea>
+
+    <div class="option-group">
+        <label for="removeDuplicates">Remove Duplicates:</label>
+        <input type="checkbox" id="removeDuplicates">
+    </div>
+
+    <div class="option-group">
+        <label for="separator">Separator:</label>
+        <input type="text" id="separator" value=",">
+    </div>
+
+    <div class="option-group">
+        <label>Enclosure:</label>
+        <label for="enclosureSingle">
+            <input type="radio" id="enclosureSingle" name="enclosure" value="'" checked>
+            Single Quotes
+        </label>
+        <label for="enclosureDouble">
+            <input type="radio" id="enclosureDouble" name="enclosure" value='"'>
+            Double Quotes
+        </label>
+    </div>
+
+    <button onclick="convertAndCopy()">Convert and Copy</button>
+    <div id="Status"></div>
+
+    <script>
+        function convertAndCopy() {
+            // Get the input value   
+            var list = document.getElementById("listInput").value.trim();
+
+            // Check if remove duplicates option is selected 
+            var removeDuplicates = document.getElementById("removeDuplicates").checked;
+
+            // Get the selected separator 
+            var separator = document.getElementById("separator").value;
+
+            // Get the selected enclosure 
+            var enclosure = "'";
+            var enclosureSingle = document.getElementById("enclosureSingle");
+            var enclosureDouble = document.getElementById("enclosureDouble");
+
+            if (enclosureDouble.checked) {
+                enclosure = '"';
+            }
+
+            // Convert the list to a comma-separated line   
+            var commaSeparatedLine = list.split("\n");
+
+            // Remove duplicates if option is selected 
+            if (removeDuplicates) {
+                commaSeparatedLine = [...new Set(commaSeparatedLine)];
+            }
+
+            commaSeparatedLine = commaSeparatedLine.map(function (value) {
+                return enclosure + value + enclosure;
+            }).join(separator);
+
+            // Create a temporary textarea element to copy the converted line   
+            var tempTextarea = document.createElement("textarea");
+            tempTextarea.value = commaSeparatedLine;
+            document.body.appendChild(tempTextarea);
+
+            // Copy the converted line to the clipboard   
+            tempTextarea.select();
+            document.execCommand("copy");
+
+            // Remove the temporary textarea element   
+            document.body.removeChild(tempTextarea);
+
+            var x = new Date();
+            document.getElementById('Status').innerHTML = 'Copied ' + (list.split().length) + ' Records at ' + x.toLocaleString();
+
+            // Show a success message   
+            <!-- alert("Copied to clipboard: " + commaSeparatedLine);   -- 
+        }   
+    </script>
+</body>
+
+</html>
