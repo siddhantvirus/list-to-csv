@@ -74,122 +74,374 @@ export class ListToCSVWebviewProvider {
     }
 
     private _getWebviewContent(webview: vscode.Webview): string {
-        // Get the path to Sample.HTML
-        const sampleHtmlPath = path.join(this.context.extensionPath, 'Sample.HTML');
-        
-        // Read the HTML content
-        let htmlContent = fs.readFileSync(sampleHtmlPath, 'utf8');
-
-        // Add the necessary script for VS Code WebView communication
-        const vscodeApiScript = `
-        <script>
-            const vscode = acquireVsCodeApi();
-
-            // Handle messages from the extension
-            window.addEventListener('message', event => {
-                const message = event.data;
-                if (message.command === 'setContent') {
-                    document.getElementById('listInput').value = message.content;
-                }
-            });
-
-            // Override the original convertAndCopy function
-            function convertAndCopy() {
-                // Get the input value   
-                var list = document.getElementById("listInput").value.trim();
-
-                // Check if remove duplicates option is selected 
-                var removeDuplicates = document.getElementById("removeDuplicates").checked;
-
-                // Get the selected separator 
-                var separator = document.getElementById("separator").value;
-
-                // Get the selected enclosure 
-                var enclosure = "'";
-                var enclosureSingle = document.getElementById("enclosureSingle");
-                var enclosureDouble = document.getElementById("enclosureDouble");
-                var sqlInClause = document.getElementById("sqlInClause");
-
-                if (enclosureDouble.checked) {
-                    enclosure = '"';
+        // Create a completely new modern UI instead of modifying Sample.HTML
+        return `<!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>List to CSV Converter</title>
+            <style>
+                :root {
+                    --container-padding: 20px;
+                    --input-padding-vertical: 6px;
+                    --input-padding-horizontal: 8px;
+                    --input-margin-vertical: 4px;
+                    --input-margin-horizontal: 0;
+                    --border-radius: 4px;
+                    --control-height: 28px;
                 }
 
-                // Convert the list to a comma-separated line   
-                var lines = list.split("\\n").filter(line => line.trim() !== "");
-
-                // Remove duplicates if option is selected 
-                if (removeDuplicates) {
-                    lines = [...new Set(lines)];
+                body {
+                    padding: 0;
+                    margin: 0;
+                    color: var(--vscode-foreground);
+                    font-family: var(--vscode-font-family);
+                    font-size: var(--vscode-font-size);
+                    font-weight: var(--vscode-font-weight);
+                    background-color: var(--vscode-editor-background);
+                }
+                
+                *:focus {
+                    outline-color: var(--vscode-focusBorder) !important;
                 }
 
-                let commaSeparatedLine;
-
-                if (sqlInClause && sqlInClause.checked) {
-                    // Format as SQL IN clause
-                    commaSeparatedLine = "IN (" + lines.map(function (value) {
-                        return enclosure + value + enclosure;
-                    }).join(separator) + ")";
-                } else {
-                    // Regular format
-                    commaSeparatedLine = lines.map(function (value) {
-                        return enclosure + value + enclosure;
-                    }).join(separator);
+                .container {
+                    padding: var(--container-padding);
+                    max-width: 800px;
+                    margin: 0 auto;
+                }
+                
+                .title {
+                    color: var(--vscode-titleBar-activeForeground);
+                    font-size: 1.5rem;
+                    margin-bottom: 1rem;
+                    border-bottom: 1px solid var(--vscode-panel-border);
+                    padding-bottom: 0.5rem;
+                    font-weight: 500;
                 }
 
-                // Create a temporary textarea element to copy the converted line   
-                var tempTextarea = document.createElement("textarea");
-                tempTextarea.value = commaSeparatedLine;
-                document.body.appendChild(tempTextarea);
+                .input-area {
+                    margin-bottom: 1rem;
+                }
 
-                // Copy the converted line to the clipboard   
-                tempTextarea.select();
-                document.execCommand("copy");
+                .input-area label {
+                    display: block;
+                    margin-bottom: 0.5rem;
+                    color: var(--vscode-foreground);
+                    font-weight: 500;
+                }
 
-                // Remove the temporary textarea element   
-                document.body.removeChild(tempTextarea);
+                textarea {
+                    width: 100%;
+                    height: 180px;
+                    padding: var(--input-padding-vertical) var(--input-padding-horizontal);
+                    border: 1px solid var(--vscode-input-border);
+                    border-radius: var(--border-radius);
+                    color: var(--vscode-input-foreground);
+                    background-color: var(--vscode-input-background);
+                    resize: vertical;
+                    font-family: var(--vscode-editor-font-family);
+                    font-size: var(--vscode-editor-font-size);
+                }
 
-                var x = new Date();
-                document.getElementById('Status').innerHTML = 'Copied ' + lines.length + ' Records at ' + x.toLocaleString();
+                .options-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+                    gap: 1rem;
+                    margin-bottom: 1.5rem;
+                }
 
-                // Notify the extension
-                vscode.postMessage({
-                    command: 'convertAndCopy',
-                    count: lines.length
+                .option-card {
+                    background-color: var(--vscode-panel-background);
+                    border: 1px solid var(--vscode-panel-border);
+                    border-radius: var(--border-radius);
+                    padding: 1rem;
+                }
+
+                .option-card h3 {
+                    margin-top: 0;
+                    margin-bottom: 0.75rem;
+                    font-size: 1rem;
+                    font-weight: 500;
+                    color: var(--vscode-panelTitle-activeForeground);
+                }
+
+                .checkbox-container, .radio-container {
+                    display: flex;
+                    align-items: center;
+                    margin: 0.5rem 0;
+                }
+
+                .checkbox-container input[type="checkbox"],
+                .radio-container input[type="radio"] {
+                    margin-right: 8px;
+                    accent-color: var(--vscode-checkbox-background);
+                }
+
+                .separator-input {
+                    width: 100%;
+                    max-width: 100%;
+                    box-sizing: border-box;
+                }
+
+                input[type="text"] {
+                    width: 100%;
+                    padding: var(--input-padding-vertical) var(--input-padding-horizontal);
+                    border: 1px solid var(--vscode-input-border);
+                    color: var(--vscode-input-foreground);
+                    background-color: var(--vscode-input-background);
+                    border-radius: var(--border-radius);
+                    box-sizing: border-box;
+                }
+
+                button {
+                    display: inline-block;
+                    border: none;
+                    padding: 8px 16px;
+                    background-color: var(--vscode-button-background);
+                    color: var(--vscode-button-foreground);
+                    border-radius: var(--border-radius);
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: background-color 0.2s;
+                }
+
+                button:hover {
+                    background-color: var(--vscode-button-hoverBackground);
+                }
+
+                button:active {
+                    transform: translateY(1px);
+                }
+
+                .button-row {
+                    display: flex;
+                    gap: 0.5rem;
+                    margin-bottom: 1rem;
+                }
+
+                .status-area {
+                    margin-top: 1.5rem;
+                    padding: 1rem;
+                    border-radius: var(--border-radius);
+                    background-color: var(--vscode-panel-background);
+                    border: 1px solid var(--vscode-panel-border);
+                }
+
+                .status-area.success {
+                    border-color: var(--vscode-notificationsSuccessBorder);
+                    background-color: var(--vscode-notificationsSuccessBackground, var(--vscode-panel-background));
+                }
+
+                .output-preview {
+                    margin-top: 1rem;
+                    padding: 0.75rem;
+                    border: 1px solid var(--vscode-panel-border);
+                    border-radius: var(--border-radius);
+                    background-color: var(--vscode-editorWidget-background);
+                    max-height: 150px;
+                    overflow: auto;
+                    white-space: pre-wrap;
+                    font-family: var(--vscode-editor-font-family);
+                    font-size: var(--vscode-editor-font-size);
+                }
+
+                .hidden {
+                    display: none;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1 class="title">List to CSV Converter</h1>
+                
+                <div class="input-area">
+                    <label for="listInput">Input Text:</label>
+                    <textarea id="listInput" placeholder="Enter your list here (one item per line)"></textarea>
+                </div>
+                
+                <div class="options-grid">
+                    <div class="option-card">
+                        <h3>List Options</h3>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="removeDuplicates">
+                            <label for="removeDuplicates">Remove Duplicates</label>
+                        </div>
+                    </div>
+
+                    <div class="option-card">
+                        <h3>Separator</h3>
+                        <div class="separator-input">
+                            <input type="text" id="separator" value="," placeholder="Separator character">
+                        </div>
+                    </div>
+
+                    <div class="option-card">
+                        <h3>Enclosure</h3>
+                        <div class="radio-container">
+                            <input type="radio" id="enclosureNone" name="enclosure" value="none">
+                            <label for="enclosureNone">No Enclosure</label>
+                        </div>
+                        <div class="radio-container">
+                            <input type="radio" id="enclosureSingle" name="enclosure" value="'" checked>
+                            <label for="enclosureSingle">Single Quotes (')</label>
+                        </div>
+                        <div class="radio-container">
+                            <input type="radio" id="enclosureDouble" name="enclosure" value='"'>
+                            <label for="enclosureDouble">Double Quotes (")</label>
+                        </div>
+                    </div>
+
+                    <div class="option-card">
+                        <h3>Format</h3>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="sqlInClause">
+                            <label for="sqlInClause">SQL IN Clause</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="button-row">
+                    <button id="convertButton" onclick="convertAndPreview()">Preview</button>
+                    <button id="copyButton" onclick="convertAndCopy()">Convert & Copy</button>
+                </div>
+
+                <div id="previewContainer" class="hidden">
+                    <h3>Preview:</h3>
+                    <div id="outputPreview" class="output-preview"></div>
+                </div>
+
+                <div id="Status" class="status-area hidden"></div>
+            </div>
+
+            <script>
+                const vscode = acquireVsCodeApi();
+
+                // Handle messages from the extension
+                window.addEventListener('message', event => {
+                    const message = event.data;
+                    if (message.command === 'setContent') {
+                        document.getElementById('listInput').value = message.content;
+                    }
                 });
-            }
-        </script>`;
 
-        // Add SQL IN clause option
-        const sqlInClauseOption = `
-        <div class="option-group">
-            <label for="sqlInClause">SQL IN Clause:</label>
-            <input type="checkbox" id="sqlInClause">
-        </div>`;
+                // Preview function - shows result without copying
+                function convertAndPreview() {
+                    const result = processInput();
+                    if (!result) return;
+                    
+                    const previewContainer = document.getElementById('previewContainer');
+                    const outputPreview = document.getElementById('outputPreview');
+                    
+                    outputPreview.textContent = result;
+                    previewContainer.classList.remove('hidden');
+                }
 
-        // Update HTML title
-        htmlContent = htmlContent.replace(
-            '<title>List to Comma Separated Line</title>',
-            '<title>List to CSV Converter</title>'
-        );
+                // Process the input and return the result string
+                function processInput() {
+                    // Get the input value   
+                    const list = document.getElementById("listInput").value.trim();
+                    if (!list) {
+                        showStatus('Please enter some text in the input area', false);
+                        return null;
+                    }
 
-        // Insert SQL IN clause option before the convert button
-        htmlContent = htmlContent.replace(
-            '<button onclick="convertAndCopy()">Convert and Copy</button>',
-            `${sqlInClauseOption}\n    <button onclick="convertAndCopy()">Convert and Copy</button>`
-        );
+                    // Get options
+                    const removeDuplicates = document.getElementById("removeDuplicates").checked;
+                    const separator = document.getElementById("separator").value;
+                    const enclosureNone = document.getElementById("enclosureNone").checked;
+                    const enclosureSingle = document.getElementById("enclosureSingle").checked;
+                    const sqlInClause = document.getElementById("sqlInClause").checked;
+                    
+                    // Determine enclosure type
+                    let enclosure = '';
+                    if (!enclosureNone) {
+                        enclosure = enclosureSingle ? "'" : '"';
+                    }
 
-        // Append our script just before the end of body
-        htmlContent = htmlContent.replace(
-            '</body>',
-            `${vscodeApiScript}\n</body>`
-        );
+                    // Convert the list to a comma-separated line   
+                    let lines = list.split("\\n").filter(line => line.trim() !== "");
 
-        // Fix broken HTML (from the sample file)
-        htmlContent = htmlContent.replace(
-            '<!-- alert("Copied to clipboard: " + commaSeparatedLine);   -- ',
-            '<!-- alert("Copied to clipboard: " + commaSeparatedLine); -->'
-        );
+                    // Remove duplicates if option is selected 
+                    if (removeDuplicates) {
+                        lines = [...new Set(lines)];
+                    }
 
-        return htmlContent;
+                    // Format the output
+                    let commaSeparatedLine;
+                    if (sqlInClause) {
+                        // Format as SQL IN clause
+                        commaSeparatedLine = "IN (" + lines.map(function (value) {
+                            return enclosure ? (enclosure + value + enclosure) : value;
+                        }).join(separator) + ")";
+                    } else {
+                        // Regular format
+                        commaSeparatedLine = lines.map(function (value) {
+                            return enclosure ? (enclosure + value + enclosure) : value;
+                        }).join(separator);
+                    }
+
+                    return commaSeparatedLine;
+                }
+
+                // Copy to clipboard function
+                function convertAndCopy() {
+                    const result = processInput();
+                    if (!result) return;
+                    
+                    // Copy to clipboard
+                    navigator.clipboard.writeText(result).then(() => {
+                        const linesCount = document.getElementById("listInput")
+                            .value.trim()
+                            .split("\\n")
+                            .filter(line => line.trim() !== "")
+                            .length;
+                            
+                        showStatus(\`Success! Copied \${linesCount} records to clipboard\`, true);
+                        
+                        // Show preview
+                        const previewContainer = document.getElementById('previewContainer');
+                        const outputPreview = document.getElementById('outputPreview');
+                        outputPreview.textContent = result;
+                        previewContainer.classList.remove('hidden');
+                        
+                        // Notify the extension
+                        vscode.postMessage({
+                            command: 'convertAndCopy',
+                            count: linesCount
+                        });
+                    }).catch(err => {
+                        showStatus('Failed to copy: ' + err, false);
+                        vscode.postMessage({
+                            command: 'error',
+                            text: 'Failed to copy: ' + err
+                        });
+                    });
+                }
+
+                // Show status message
+                function showStatus(message, isSuccess) {
+                    const statusArea = document.getElementById('Status');
+                    statusArea.textContent = message;
+                    statusArea.classList.remove('hidden');
+                    
+                    if (isSuccess) {
+                        statusArea.classList.add('success');
+                    } else {
+                        statusArea.classList.remove('success');
+                    }
+                    
+                    // Auto hide after 5 seconds
+                    setTimeout(() => {
+                        if (!statusArea.classList.contains('pinned')) {
+                            statusArea.classList.add('hidden');
+                        }
+                    }, 5000);
+                }
+            </script>
+        </body>
+        </html>`;
     }
 }
