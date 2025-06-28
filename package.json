@@ -29,14 +29,6 @@
       {
         "command": "list-to-csv.convertToCommaLine",
         "title": "Convert List to Comma Separated Line"
-      },
-      {
-        "command": "list-to-csv.convertToCommaLineWithDefaults",
-        "title": "Convert List to Comma Separated Line (Default Settings)"
-      },
-      {
-        "command": "list-to-csv.convertToCommaLineWithLastUsed",
-        "title": "Convert List to Comma Separated Line (Last Used Settings)"
       }
     ],
     "menus": {
@@ -48,16 +40,6 @@
         },
         {
           "command": "list-to-csv.convertToCommaLine",
-          "when": "editorHasSelection",
-          "group": "1_modification"
-        },
-        {
-          "command": "list-to-csv.convertToCommaLineWithDefaults",
-          "when": "editorHasSelection",
-          "group": "1_modification"
-        },
-        {
-          "command": "list-to-csv.convertToCommaLineWithLastUsed",
           "when": "editorHasSelection",
           "group": "1_modification"
         },
@@ -90,28 +72,6 @@
           "type": "string",
           "default": "\"",
           "description": "Character used to quote fields in the CSV output"
-        },
-        "list-to-csv.line.removeDuplicates": {
-          "type": "boolean",
-          "default": false,
-          "description": "Remove duplicate entries when converting to comma-separated line"
-        },
-        "list-to-csv.line.separator": {
-          "type": "string",
-          "default": ",",
-          "description": "Character used to separate items in comma-separated line output"
-        },
-        "list-to-csv.line.enclosure": {
-          "type": "string",
-          "default": "'",
-          "enum": ["'", "\""],
-          "enumDescriptions": ["Single quotes", "Double quotes"],
-          "description": "Character used to enclose items in comma-separated line output"
-        },
-        "list-to-csv.line.sqlInClause": {
-          "type": "boolean",
-          "default": false,
-          "description": "Format output as SQL IN clause (e.g., IN ('item1','item2'))"
         }
       }
     }

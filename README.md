@@ -96,19 +96,10 @@ IN ('apple','orange','banana')
 
 This extension provides the following settings:
 
-### CSV Conversion Settings
-
 * `list-to-csv.delimiter`: Character used to separate fields in the CSV output (default: ",")
 * `list-to-csv.includeHeaders`: Include header row in the CSV output (default: true)
 * `list-to-csv.quoteAllFields`: Quote all fields in the CSV output, not just those that need it (default: false)
 * `list-to-csv.escapeCharacter`: Character used to quote fields in the CSV output (default: ")
-
-### Line Conversion Settings
-
-* `list-to-csv.line.removeDuplicates`: Remove duplicate entries when converting to comma-separated line (default: false)
-* `list-to-csv.line.separator`: Character used to separate items in comma-separated line output (default: ",")
-* `list-to-csv.line.enclosure`: Character used to enclose items in comma-separated line output (default: ')
-* `list-to-csv.line.sqlInClause`: Format output as SQL IN clause (default: false)
 
 You can access these settings by:
 1. Opening the Command Palette (Ctrl+Shift+P / Cmd+Shift+P)
@@ -120,9 +111,7 @@ You can access these settings by:
 This extension provides the following commands:
 
 * `list-to-csv.convert`: Convert the selected text to CSV format
-* `list-to-csv.convertToCommaLine`: Convert the selected text to a comma-separated line (with interactive options)
-* `list-to-csv.convertToCommaLineWithDefaults`: Convert the selected text using default line conversion settings
-* `list-to-csv.convertToCommaLineWithLastUsed`: Convert the selected text using the last used line conversion settings
+* `list-to-csv.convertToCommaLine`: Convert the selected text to a comma-separated line (with options for SQL IN clause)
 * `list-to-csv.openWebview`: Open the interactive WebView interface
 * `list-to-csv.openSettings`: Open the extension settings
 
