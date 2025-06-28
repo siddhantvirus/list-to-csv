@@ -4,12 +4,13 @@ A Visual Studio Code extension to easily convert various list formats into CSV d
 
 ## Features
 
-This extension allows you to convert different types of lists (bullet points, numbered lists, or plain text) into properly formatted CSV data. It's particularly useful when you need to:
+This extension allows you to convert different types of lists (bullet points, numbered lists, or plain text) into properly formatted CSV data or comma-separated lines. It's particularly useful when you need to:
 
 - Convert bullet point lists to structured CSV data
 - Transform numbered lists into spreadsheet-ready formats
 - Extract data from lists with consistent formatting
 - Prepare list data for import into Excel, Google Sheets, or databases
+- Create SQL IN clauses from lists for database queries
 
 ### Supported List Types
 
@@ -19,13 +20,37 @@ This extension allows you to convert different types of lists (bullet points, nu
 
 ### How it works
 
+#### List to CSV Conversion
+
 Select your list in the editor, right-click, and choose "Convert List to CSV" from the context menu:
 
 ![Convert List to CSV](https://raw.githubusercontent.com/yourusername/list-to-csv/main/images/demo.gif)
 
+#### Interactive WebView
+
+Open the interactive WebView by:
+
+1. Right-clicking on selected text and choosing "Open List to CSV Converter (WebView)"
+2. Using the Command Palette (Ctrl+Shift+P) and typing "Open List to CSV Converter (WebView)"
+
+The WebView provides a user-friendly interface with options for:
+- Removing duplicates
+- Choosing separators
+- Setting quote style (single or double quotes)
+- Formatting as SQL IN clause
+
+#### Command Palette Integration
+
+You can also convert lists via the Command Palette:
+
+1. Select your list text
+2. Open the Command Palette (Ctrl+Shift+P)
+3. Type "Convert List to Comma Separated Line"
+4. Follow the prompts to configure your conversion options
+
 ## Usage Examples
 
-**Convert a bullet list:**
+**Convert a bullet list to CSV:**
 
 ```
 * Apple Red 1.99
@@ -41,19 +66,30 @@ Banana,Yellow,0.99
 Orange,Orange,2.49
 ```
 
-**Convert a numbered list:**
+**Convert list to comma-separated line:**
+
 ```
-1. Product1 $10.00 In Stock
-2. Product2 $25.50 Out of Stock
-3. Product3 $5.75 In Stock
+apple
+orange
+banana
 ```
 
-**To CSV output:**
+**To comma-separated line:**
 ```
-Column 1,Column 2,Column 3
-Product1,$10.00,In Stock
-Product2,$25.50,Out of Stock
-Product3,$5.75,In Stock
+'apple','orange','banana'
+```
+
+**Convert list to SQL IN clause:**
+
+```
+apple
+orange
+banana
+```
+
+**To SQL IN clause:**
+```
+IN ('apple','orange','banana')
 ```
 
 ## Extension Settings
@@ -70,6 +106,15 @@ You can access these settings by:
 2. Typing "Open List to CSV Settings"
 3. Selecting the extension settings that appear
 
+## Commands
+
+This extension provides the following commands:
+
+* `list-to-csv.convert`: Convert the selected text to CSV format
+* `list-to-csv.convertToCommaLine`: Convert the selected text to a comma-separated line (with options for SQL IN clause)
+* `list-to-csv.openWebview`: Open the interactive WebView interface
+* `list-to-csv.openSettings`: Open the extension settings
+
 ## Requirements
 
 No additional requirements or dependencies.
@@ -81,6 +126,9 @@ No additional requirements or dependencies.
 - Initial release
 - Support for bullet points, numbered lists, and plain text
 - Configurable delimiter, headers, and quoting options
+- WebView interface based on Sample.HTML
+- SQL IN clause formatting option
+- Command palette integration for all features
 
 ## Contributing
 

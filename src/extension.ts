@@ -1,6 +1,9 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import { ListToCSVWebviewProvider } from './listToCSVWebviewProvider';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface ConversionOptions {
     delimiter: string;
@@ -9,11 +12,29 @@ interface ConversionOptions {
     escapeCharacter: string;
 }
 
+interface CommaListOptions {
+    removeDuplicates: boolean;
+    separator: string;
+    enclosure: string;
+    sqlInClause: boolean;
+}
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
     // Use the console to output diagnostic information (console.log) and errors (console.error)
     console.log('Congratulations, your extension "list-to-csv" is now active!');
+
+    // Create an instance of our WebView provider
+    const listToCSVWebviewProvider = new ListToCSVWebviewProvider(context);
+
+    // Register the command to open the WebView
+    const openWebviewCommand = vscode.commands.registerCommand(
+        'list-to-csv.openWebview',
+        () => {
+            listToCSVWebviewProvider.show();
+        }
+    );
 
     // Register the convert to CSV command
     const convertToCSVCommand = vscode.commands.registerTextEditorCommand(
@@ -45,6 +66,39 @@ export function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    // Register the command to convert text to comma separated line (similar to HTML page)
+    const convertToCommaLineCommand = vscode.commands.registerTextEditorCommand(
+        'list-to-csv.convertToCommaLine',
+        async (textEditor: vscode.TextEditor) => {
+            try {
+                // Get the selected text
+                const selection = textEditor.selection;
+                if (selection.isEmpty) {
+                    vscode.window.showInformationMessage('Please select a list to convert');
+                    return;
+                }
+                
+                const selectedText = textEditor.document.getText(selection);
+
+                // Get options for conversion from user
+                const options = await getCommaLineOptions();
+                if (!options) {
+                    return; // User cancelled the operation
+                }
+                
+                // Convert the text to comma-separated line
+                const result = convertToCommaLine(selectedText, options);
+                
+                // Copy to clipboard
+                await vscode.env.clipboard.writeText(result);
+                
+                vscode.window.showInformationMessage(`Converted list to ${options.sqlInClause ? 'SQL IN clause' : 'comma-separated line'} and copied to clipboard!`);
+            } catch (error) {
+                vscode.window.showErrorMessage(`Error converting list: ${error}`);
+            }
+        }
+    );
+
     // Register the command to open settings
     const openSettingsCommand = vscode.commands.registerCommand(
         'list-to-csv.openSettings',
@@ -53,7 +107,120 @@ export function activate(context: vscode.ExtensionContext) {
         }
     );
 
-    context.subscriptions.push(convertToCSVCommand, openSettingsCommand);
+    // Make sure the Sample.HTML file exists in the extension directory
+    ensureSampleHtmlExists(context);
+
+    context.subscriptions.push(
+        convertToCSVCommand, 
+        openSettingsCommand,
+        openWebviewCommand,
+        convertToCommaLineCommand
+    );
+}
+
+/**
+ * Ensure that Sample.HTML exists in the extension directory
+ */
+function ensureSampleHtmlExists(context: vscode.ExtensionContext) {
+    const sampleHtmlPath = path.join(context.extensionPath, 'Sample.HTML');
+    
+    // If it doesn't exist, we need to create it
+    if (!fs.existsSync(sampleHtmlPath)) {
+        const currentFilePath = '/home/sidops/personal/VSCode Extensions/list-to-csv/Sample.HTML';
+        if (fs.existsSync(currentFilePath)) {
+            try {
+                fs.copyFileSync(currentFilePath, sampleHtmlPath);
+                console.log('Copied Sample.HTML to extension directory');
+            } catch (error) {
+                console.error('Failed to copy Sample.HTML to extension directory:', error);
+            }
+        } else {
+            console.error('Sample.HTML not found in the workspace');
+        }
+    }
+}
+
+/**
+ * Prompt the user for comma-separated line options
+ */
+async function getCommaLineOptions(): Promise<CommaListOptions | undefined> {
+    // Ask about removeDuplicates
+    const removeDuplicates = await vscode.window.showQuickPick(
+        ['Yes', 'No'],
+        { placeHolder: 'Remove duplicates?' }
+    );
+
+    if (!removeDuplicates) {
+        return undefined;
+    }
+
+    // Ask about separator
+    const separator = await vscode.window.showInputBox({
+        prompt: 'Enter separator character',
+        value: ',',
+        validateInput: value => !value ? 'Separator cannot be empty' : null
+    });
+
+    if (!separator) {
+        return undefined;
+    }
+
+    // Ask about enclosure type
+    const enclosureType = await vscode.window.showQuickPick(
+        ['Single quotes (\')', 'Double quotes (")'],
+        { placeHolder: 'Select enclosure type' }
+    );
+
+    if (!enclosureType) {
+        return undefined;
+    }
+
+    // Ask about SQL IN clause
+    const sqlInClause = await vscode.window.showQuickPick(
+        ['Yes', 'No'],
+        { placeHolder: 'Format as SQL IN clause?' }
+    );
+
+    if (!sqlInClause) {
+        return undefined;
+    }
+
+    return {
+        removeDuplicates: removeDuplicates === 'Yes',
+        separator,
+        enclosure: enclosureType.startsWith('Single') ? "'" : '"',
+        sqlInClause: sqlInClause === 'Yes'
+    };
+}
+
+/**
+ * Convert list text to comma-separated line
+ */
+function convertToCommaLine(text: string, options: CommaListOptions): string {
+    // Split text into lines and remove empty lines
+    const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+    
+    if (lines.length === 0) {
+        throw new Error('No valid list items found');
+    }
+    
+    // Remove duplicates if specified
+    let processedLines = options.removeDuplicates ? [...new Set(lines)] : lines;
+    
+    // Format lines with enclosures
+    const formattedLines = processedLines.map(line => 
+        `${options.enclosure}${line}${options.enclosure}`
+    );
+    
+    // Join with separator
+    let result = formattedLines.join(options.separator);
+    
+    // Add SQL IN clause wrapper if specified
+    if (options.sqlInClause) {
+        result = `IN (${result})`;
+    }
+    
+    return result;
 }
 
 /**
