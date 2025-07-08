@@ -76,3 +76,20 @@
 3. **Template System**
    - Save and reuse conversion configurations
    - Custom templates for different SQL dialects
+
+
+SQL generate Table is not working on view.
+Last Used Setting is now removed.
+Save it as .sql file if needed
+Image is not showing up
+
+We need to be able to use multi-row inserts, instead of multiple insert statements.
+
+Overrall, let's also make sure that the user does not feel bombarded with excess options in the command pallete and right click menu, 
+
+Should we be having helper functions or breakdown into multiple components to make sure extension.ts and webview are not having  the code re-used twice, or is it necessary to make sure that it does not really cause any issues ?
+I will be ultimately bundling using esbuild so I just don't want bundle size to exceed.
+
+Also, in the extension and not in the webview, I believe I was earlier able to create csv with seperate columns. That seems to have gone and it is n
+
+I want the functionality of converting to single line reserved only for 

@@ -17,6 +17,7 @@ vsc-extension-quickstart.md
 *.vsix
 TODO.md
 INSTRUCTIONS.md
+extra.md
 eslint.config.mjs
 .vscode-test.mjs
 scripts

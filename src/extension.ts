@@ -28,6 +28,11 @@ interface SqlTableOptions {
     includeHeaders?: boolean;
 }
 
+// Constants for storing last used configurations
+const LAST_USED_COMMA_LIST_CONFIG = 'lastUsedCommaListConfig';
+const LAST_USED_SQL_TABLE_CONFIG = 'lastUsedSqlTableConfig';
+const LAST_USED_CSV_CONFIG = 'lastUsedCsvConfig';
+
 // Define message options for expanded alerts
 const expandedMessageOptions: vscode.MessageOptions = {
     modal: true,
@@ -206,6 +211,94 @@ export function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    // Register internal command to save configuration
+    const saveConfigCommand = vscode.commands.registerCommand(
+        '_listToCSV.saveLastUsedConfig',
+        (key: string, config: any) => {
+            // Store configuration in global state
+            context.globalState.update(key, config);
+        }
+    );
+
+    // Register the command to use the last configuration
+    const lastUsedConfigCommand = vscode.commands.registerTextEditorCommand(
+        'list-to-csv.lastUsedConfigurations',
+        async (textEditor: vscode.TextEditor) => {
+            try {
+                // Get the selected text
+                const selection = textEditor.selection;
+                if (selection.isEmpty) {
+                    const messageOptions = {...expandedMessageOptions};
+                    messageOptions.detail = 'Please select text before using last configuration.';
+                    vscode.window.showInformationMessage('Please select content to convert', messageOptions);
+                    return;
+                }
+                
+                const selectedText = textEditor.document.getText(selection);
+
+                // Show the available configurations
+                const configOptions = [
+                    { label: 'CSV Format', key: LAST_USED_CSV_CONFIG },
+                    { label: 'Comma Separated Line', key: LAST_USED_COMMA_LIST_CONFIG },
+                    { label: 'SQL Table', key: LAST_USED_SQL_TABLE_CONFIG }
+                ].filter(option => context.globalState.get(option.key) !== undefined);
+
+                if (configOptions.length === 0) {
+                    vscode.window.showInformationMessage('No saved configurations found. Please use other commands first.');
+                    return;
+                }
+
+                const selectedConfig = await vscode.window.showQuickPick(
+                    configOptions,
+                    { placeHolder: 'Select a saved configuration to use' }
+                );
+
+                if (!selectedConfig) {
+                    return; // User cancelled
+                }
+
+                const config = context.globalState.get(selectedConfig.key);
+                
+                // Process based on the configuration type
+                if (selectedConfig.key === LAST_USED_CSV_CONFIG) {
+                    const csvText = convertListToCSV(selectedText, config as ConversionOptions);
+                    textEditor.edit(edit => {
+                        edit.replace(selection, csvText);
+                    });
+                    vscode.window.showInformationMessage('List converted to CSV using last configuration');
+                    
+                } else if (selectedConfig.key === LAST_USED_COMMA_LIST_CONFIG) {
+                    const result = convertToCommaLine(selectedText, config as CommaListOptions);
+                    await vscode.env.clipboard.writeText(result);
+                    vscode.window.showInformationMessage('List converted to comma-separated line using last configuration and copied to clipboard');
+                    
+                } else if (selectedConfig.key === LAST_USED_SQL_TABLE_CONFIG) {
+                    const sqlConfig = config as SqlTableOptions;
+                    
+                    // Parse the data for preview or SQL generation
+                    const { headers, dataLines } = parseSqlTabularData(selectedText, sqlConfig.includeHeaders);
+                    
+                    if (sqlConfig.previewData) {
+                        const previewResult = await showDataPreviewWebview(headers, dataLines, sqlConfig, context);
+                        
+                        if (previewResult === 'cancelled') {
+                            return; // User cancelled after preview
+                        }
+                    }
+                    
+                    const sqlStatement = createSqlTableStatement(headers, dataLines, sqlConfig);
+                    await vscode.env.clipboard.writeText(sqlStatement);
+                    vscode.window.showInformationMessage('SQL table generated using last configuration and copied to clipboard');
+                }
+                
+            } catch (error) {
+                const messageOptions = {...expandedMessageOptions};
+                messageOptions.detail = `Error details: ${error}`;
+                vscode.window.showErrorMessage(`Error applying last used configuration`, messageOptions);
+            }
+        }
+    );
+
     // Make sure the Sample.HTML file exists in the extension directory
     ensureSampleHtmlExists(context);
 
@@ -214,7 +307,9 @@ export function activate(context: vscode.ExtensionContext) {
         openSettingsCommand,
         openWebviewCommand,
         convertToCommaLineCommand,
-        generateSQLTableCommand
+        generateSQLTableCommand,
+        saveConfigCommand,
+        lastUsedConfigCommand
     );
 }
 
@@ -285,12 +380,17 @@ async function getCommaLineOptions(): Promise<CommaListOptions | undefined> {
         return undefined;
     }
 
-    return {
+    const options = {
         removeDuplicates: removeDuplicates === 'Yes',
         separator,
         enclosure: enclosureType.startsWith('Single') ? "'" : '"',
         sqlInClause: sqlInClause === 'Yes'
     };
+    
+    // Save as last used configuration
+    vscode.commands.executeCommand('_listToCSV.saveLastUsedConfig', LAST_USED_COMMA_LIST_CONFIG, options);
+    
+    return options;
 }
 
 /**
@@ -329,12 +429,17 @@ function convertToCommaLine(text: string, options: CommaListOptions): string {
 function getConversionOptions(): ConversionOptions {
     const config = vscode.workspace.getConfiguration('list-to-csv');
     
-    return {
+    const options = {
         delimiter: config.get<string>('delimiter', ','),
         includeHeaders: config.get<boolean>('includeHeaders', true),
         quoteAllFields: config.get<boolean>('quoteAllFields', false),
         escapeCharacter: config.get<string>('escapeCharacter', '"'),
     };
+    
+    // Save as last used configuration
+    vscode.commands.executeCommand('_listToCSV.saveLastUsedConfig', LAST_USED_CSV_CONFIG, options);
+    
+    return options;
 }
 
 /**
@@ -542,13 +647,18 @@ async function getSqlTableOptions(): Promise<SqlTableOptions | undefined> {
         return undefined;
     }
 
-    return {
+    const options = {
         tableName,
         dialect: sqlDialect.value as 'mssql' | 'mysql' | 'postgres' | 'spark',
         inferDataTypes: inferDataTypes === 'Yes',
         previewData: previewData === 'Yes',
         includeHeaders: includeHeaders === 'Yes'
     };
+    
+    // Save as last used configuration
+    vscode.commands.executeCommand('_listToCSV.saveLastUsedConfig', LAST_USED_SQL_TABLE_CONFIG, options);
+    
+    return options;
 }
 
 /**
