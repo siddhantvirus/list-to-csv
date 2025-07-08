@@ -24,9 +24,11 @@ This extension allows you to convert different types of lists (bullet points, nu
 
 #### List to CSV Conversion
 
-Select your list in the editor, right-click, and choose "Convert List to CSV" from the context menu:
+Select your list in the editor, right-click, and choose "Convert List to CSV" from the context menu
+<!-- 
+:
 
-![Convert List to CSV](https://raw.githubusercontent.com/yourusername/list-to-csv/main/images/demo.gif)
+![Convert List to CSV](https://raw.githubusercontent.com/yourusername/list-to-csv/main/images/demo.gif) -->
 
 #### Interactive WebView
 
@@ -134,7 +136,7 @@ In the WebView interface, you can also:
 - Configure table name, SQL dialect, and data type inference settings
 - Use the "Generate SQL Table & Data" button to create a complete SQL script and preview it
 
-![SQL Table Generation](https://raw.githubusercontent.com/yourusername/list-to-csv/main/images/sql-table-demo.gif)
+<!-- ![SQL Table Generation](https://raw.githubusercontent.com/yourusername/list-to-csv/main/images/sql-table-demo.gif) -->
 
 ## Extension Settings
 
@@ -176,7 +178,7 @@ No additional requirements or dependencies.
 
 ## Contributing
 
-If you'd like to contribute to this extension, please feel free to submit a pull request or open an issue on the [GitHub repository](https://github.com/yourusername/list-to-csv).
+If you'd like to contribute to this extension, please feel free to submit a pull request or open an issue on the [GitHub repository](https://github.com/siddhantvirus/list-to-csv).
 
 ## License
 
